@@ -1,9 +1,16 @@
 package com.secureforge.passforge;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -22,6 +29,8 @@ public class GeneratePasswordScreen extends AppCompatActivity {
     private CheckBox checkboxSpecialChars;
     private Button buttonGeneratePassword;
     private TextView txtGeneratedPassword;
+    private ProgressBar passwordStrengthMeter;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,6 +45,9 @@ public class GeneratePasswordScreen extends AppCompatActivity {
         checkboxSpecialChars = findViewById(R.id.checkboxSpecialChars);
         buttonGeneratePassword = findViewById(R.id.buttonGeneratePassword);
         txtGeneratedPassword = findViewById(R.id.txtGeneratedPassword);
+        Button buttonCopyPassword = findViewById(R.id.buttonCopyPassword);
+
+        passwordStrengthMeter = findViewById(R.id.passwordStrengthMeter);
 
         // Set the initial length value for the password
         txtLengthValue.setText(String.valueOf(seekBarLength.getProgress()));
@@ -88,7 +100,57 @@ public class GeneratePasswordScreen extends AppCompatActivity {
 
             String password = generatePassword(length, includeUppercase, includeLowercase, includeNumbers, includeSpecialChars);
             txtGeneratedPassword.setText(password);
+
+            updatePasswordStrengthMeter(password);
         });
+
+        buttonCopyPassword.setOnClickListener(v -> {
+            String passwordToCopy = txtGeneratedPassword.getText().toString();
+
+            if (!TextUtils.isEmpty(passwordToCopy)) {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip = ClipData.newPlainText("Copied Password", passwordToCopy);
+                clipboard.setPrimaryClip(clip);
+
+                Toast.makeText(GeneratePasswordScreen.this, "Password copied to clipboard", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(GeneratePasswordScreen.this, "No password to copy", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+    }
+
+    private void updatePasswordStrengthMeter(String password) {
+        int strengthPercentage = calculatePasswordStrength(password);
+        passwordStrengthMeter.setProgress(strengthPercentage);
+
+        // Change color based on strength
+        if (strengthPercentage < 40) {
+            passwordStrengthMeter.getProgressDrawable().setColorFilter(
+                    Color.RED, android.graphics.PorterDuff.Mode.SRC_IN);
+        } else if (strengthPercentage < 70) {
+            passwordStrengthMeter.getProgressDrawable().setColorFilter(
+                    Color.YELLOW, android.graphics.PorterDuff.Mode.SRC_IN);
+        } else {
+            passwordStrengthMeter.getProgressDrawable().setColorFilter(
+                    Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN);
+        }
+    }
+
+    private int calculatePasswordStrength(String password) {
+        int lengthScore = Math.min(password.length() * 5, 30); // Length contributes up to 30%
+        int varietyScore = 0;
+
+        // Check for character variety (uppercase, lowercase, digits, special characters)
+        if (password.matches(".*[A-Z].*")) varietyScore += 15; // Uppercase letters
+        if (password.matches(".*[a-z].*")) varietyScore += 15; // Lowercase letters
+        if (password.matches(".*\\d.*")) varietyScore += 20;   // Digits
+        if (password.matches(".*[!@#$%^&*(),.?\":{}|<>].*"))
+            varietyScore += 20; // Special characters
+
+        // Total strength score, capped at 100%
+        int totalScore = lengthScore + varietyScore;
+        return Math.min(totalScore, 100);
     }
 
     private String generatePassword(int length, boolean includeUppercase, boolean includeLowercase, boolean includeNumbers, boolean includeSpecialChars) {
