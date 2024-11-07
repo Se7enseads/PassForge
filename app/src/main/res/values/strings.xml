@@ -1,6 +1,17 @@
 <resources>
-    <string name="app_name">PassForge</string>
+    <string name="app_name" translatable="false">PassForge</string>
     <string name="app_slogan">Forge Unbreakable Security</string>
     <string name="app_logo">App Logo</string>
     <string name="sign_in_title">Sign In Page</string>
+
+    <!-- Onboarding Screen -->
+
+    <string name="screen1">"Welcome to PassForge!"</string>
+    <string name="screen1desc">Your all-in-one solution for creating and managing secure passwords. Say goodbye to weak, easy-to-guess passwords and protect your accounts effortlessly!</string>
+
+    <string name="screen2">Generate Ultra-Secure Passwords</string>
+    <string name="screen2desc">Quickly create complex, unique passwords with just a tap. Designed for maximum security, tailored to meet the needs of any platform.</string>
+
+    <string name="screen3">Store Passwords Safely</string>
+    <string name="screen3desc">Create an account with PassForge and securely store all your passwords in one place. Access them easily anytime, anywhere.</string>
 </resources>

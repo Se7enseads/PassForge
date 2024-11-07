@@ -16,7 +16,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 public class Splash_Screen extends AppCompatActivity {
 
-    private final int SPLASH_DISPLAY_DURATION = 3500;
+    private final int SPLASH_DISPLAY_DURATION = 4000;
     TextView com_name, com_slogan;
     ImageView com_logo;
 
@@ -27,7 +27,6 @@ public class Splash_Screen extends AppCompatActivity {
 
         com_name = findViewById(R.id.txt_app_name);
         com_slogan = findViewById(R.id.txt_app_slogan);
-        com_logo = findViewById(R.id.app_logo);
 
         Boolean isFirstRun = getSharedPreferences("PREFERENCE", MODE_PRIVATE)
                 .getBoolean("isFirstRun", true);
@@ -36,7 +35,7 @@ public class Splash_Screen extends AppCompatActivity {
             @Override
             public void run() {
                 if(!isFirstRun){
-                    startActivity(new Intent(Splash_Screen.this,Signin_Screen.class));
+                    startActivity(new Intent(Splash_Screen.this, SignIn_Screen.class));
                     finish();
                 } else {
                     startActivity(new Intent(Splash_Screen.this,Welcome_Screen.class));
@@ -46,9 +45,6 @@ public class Splash_Screen extends AppCompatActivity {
             }
         }, SPLASH_DISPLAY_DURATION);
 
-        Animation fade = AnimationUtils.loadAnimation(this,R.anim.fade);
-        com_logo.startAnimation(fade);
-        
         Animation slideInRight = AnimationUtils.loadAnimation(this,R.anim.slide_in);
         com_name.startAnimation(slideInRight);
 
