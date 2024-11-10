@@ -41,6 +41,7 @@ dependencies {
     implementation(libs.lottie)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation(libs.preference)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

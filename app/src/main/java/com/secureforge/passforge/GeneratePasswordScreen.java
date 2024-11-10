@@ -1,15 +1,19 @@
 package com.secureforge.passforge;
 
+import static android.content.ContentValues.TAG;
+
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.view.View;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -17,6 +21,16 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class GeneratePasswordScreen extends AppCompatActivity {
@@ -27,9 +41,9 @@ public class GeneratePasswordScreen extends AppCompatActivity {
     private CheckBox checkboxLowercase;
     private CheckBox checkboxNumbers;
     private CheckBox checkboxSpecialChars;
-    private Button buttonGeneratePassword;
     private TextView txtGeneratedPassword;
     private ProgressBar passwordStrengthMeter;
+    private FirebaseAuth mAuth;
 
 
     @Override
@@ -43,13 +57,15 @@ public class GeneratePasswordScreen extends AppCompatActivity {
         checkboxLowercase = findViewById(R.id.checkboxLowercase);
         checkboxNumbers = findViewById(R.id.checkboxNumbers);
         checkboxSpecialChars = findViewById(R.id.checkboxSpecialChars);
-        buttonGeneratePassword = findViewById(R.id.buttonGeneratePassword);
+        Button buttonGeneratePassword = findViewById(R.id.buttonGeneratePassword);
         txtGeneratedPassword = findViewById(R.id.txtGeneratedPassword);
         Button buttonCopyPassword = findViewById(R.id.buttonCopyPassword);
+        Button buttonSavePassword = findViewById(R.id.buttonSavePassword);
+
+        mAuth = FirebaseAuth.getInstance();
 
         passwordStrengthMeter = findViewById(R.id.passwordStrengthMeter);
 
-        // Set the initial length value for the password
         txtLengthValue.setText(String.valueOf(seekBarLength.getProgress()));
 
         seekBarLength.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -118,13 +134,55 @@ public class GeneratePasswordScreen extends AppCompatActivity {
             }
         });
 
+        buttonSavePassword.setOnClickListener(v -> {
+            FirebaseUser currentUser = mAuth.getCurrentUser();
+
+            if (currentUser != null) {
+                String userId = currentUser.getUid();
+                String password = txtGeneratedPassword.getText().toString();
+                if (!TextUtils.isEmpty(password)) {
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setTitle("Save Password Details");
+
+                    final EditText inputName = new EditText(this);
+                    inputName.setHint("Enter website name");
+
+                    final EditText inputLink = new EditText(this);
+                    inputLink.setHint("Enter website link");
+
+                    LinearLayout layout = new LinearLayout(this);
+                    layout.setOrientation(LinearLayout.VERTICAL);
+                    layout.addView(inputName);
+                    layout.addView(inputLink);
+                    builder.setView(layout);
+
+                    builder.setPositiveButton("Save", (dialog, which) -> {
+                        String websiteName = inputName.getText().toString();
+                        String websiteLink = inputLink.getText().toString();
+
+                        savePasswordToFirestore(currentUser.getUid(), password, websiteName, websiteLink);
+                    });
+
+                    builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+                    builder.show();
+
+                } else {
+                    Toast.makeText(getApplicationContext(), "No password to save", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(getApplicationContext(), "User not logged in", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+
     }
 
     private void updatePasswordStrengthMeter(String password) {
         int strengthPercentage = calculatePasswordStrength(password);
         passwordStrengthMeter.setProgress(strengthPercentage);
 
-        // Change color based on strength
         if (strengthPercentage < 40) {
             passwordStrengthMeter.getProgressDrawable().setColorFilter(
                     Color.RED, android.graphics.PorterDuff.Mode.SRC_IN);
@@ -138,17 +196,15 @@ public class GeneratePasswordScreen extends AppCompatActivity {
     }
 
     private int calculatePasswordStrength(String password) {
-        int lengthScore = Math.min(password.length() * 5, 30); // Length contributes up to 30%
+        int lengthScore = Math.min(password.length() * 5, 30);
         int varietyScore = 0;
 
-        // Check for character variety (uppercase, lowercase, digits, special characters)
-        if (password.matches(".*[A-Z].*")) varietyScore += 15; // Uppercase letters
-        if (password.matches(".*[a-z].*")) varietyScore += 15; // Lowercase letters
-        if (password.matches(".*\\d.*")) varietyScore += 20;   // Digits
+        if (password.matches(".*[A-Z].*")) varietyScore += 15;
+        if (password.matches(".*[a-z].*")) varietyScore += 15;
+        if (password.matches(".*\\d.*")) varietyScore += 20;
         if (password.matches(".*[!@#$%^&*(),.?\":{}|<>].*"))
-            varietyScore += 20; // Special characters
+            varietyScore += 20;
 
-        // Total strength score, capped at 100%
         int totalScore = lengthScore + varietyScore;
         return Math.min(totalScore, 100);
     }
@@ -174,4 +230,35 @@ public class GeneratePasswordScreen extends AppCompatActivity {
 
         return password.toString();
     }
+
+    private void savePasswordToFirestore(String userId, String password, String websiteName, String websiteLink) {
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        DocumentReference userRef = db.collection("users").document(userId);
+
+        // Create a map to store the password along with website name and link
+        Map<String, Object> passwordDetails = new HashMap<>();
+        passwordDetails.put("password", password);
+        passwordDetails.put("websiteName", websiteName);
+        passwordDetails.put("websiteLink", websiteLink);
+
+        userRef.update("passwords", FieldValue.arrayUnion(passwordDetails))
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(GeneratePasswordScreen.this, "Password saved successfully", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    Map<String, Object> initialData = new HashMap<>();
+                    initialData.put("passwords", List.of(passwordDetails));
+
+                    // If the arrayUnion fails, create the "passwords" field
+                    userRef.set(initialData, SetOptions.merge())
+                            .addOnSuccessListener(aVoid -> {
+                                Toast.makeText(GeneratePasswordScreen.this, "Password saved successfully", Toast.LENGTH_SHORT).show();
+                            })
+                            .addOnFailureListener(error -> {
+                                Toast.makeText(GeneratePasswordScreen.this, "Failed to save password", Toast.LENGTH_SHORT).show();
+                                Log.w(TAG, "Error writing document", error);
+                            });
+                });
+    }
+
 }
