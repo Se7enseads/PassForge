@@ -1,0 +1,71 @@
+name: Build and Sign APK on Tag Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout the code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Set up Java
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'adopt'
+        java-version: '17'  # Ensure this matches your project's Java version
+
+    # Decrypt the keystore file
+    - name: Decode keystore
+      run: |
+        echo "$KEYSTORE_FILE" | base64 --decode > my-release-key.keystore
+
+    # Cache Gradle dependencies
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.gradle/caches
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    # Build the APK
+    - name: Build APK
+      run: ./gradlew assembleRelease
+
+    # Sign the APK
+    - name: Sign APK
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: |
+        jarsigner -verbose -keystore my-release-key.keystore \
+          -storepass $KEYSTORE_PASSWORD \
+          -keypass $KEY_PASSWORD \
+          app/build/outputs/apk/release/app-release-unsigned.apk \
+          $KEY_ALIAS
+
+    # Verify the signed APK
+    - name: Verify signed APK
+      run: |
+        jarsigner -verify app/build/outputs/apk/release/app-release-unsigned.apk
+
+    # Align the APK (Optional, for optimization)
+    - name: Align APK
+      run: |
+        zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk \
+        app/build/outputs/apk/release/app-release.apk
+
+    # Upload the APK as an artifact
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: app-release.apk
+        path: app/build/outputs/apk/release/app-release.apk
